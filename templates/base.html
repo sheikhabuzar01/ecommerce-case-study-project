@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}NOVU Store{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────── -->
+<nav class="nav">
+  <a class="nav__logo" href="/">NOVU</a>
+  <form class="nav__search" action="/" method="get">
+    <input name="search" placeholder="Search products…" value="{{ search if search is defined else '' }}" />
+    <button type="submit">⌕</button>
+  </form>
+  <a class="nav__cart" href="/cart">
+    <span class="nav__cart-icon">🛒</span>
+    <span class="nav__cart-badge" id="cart-badge">{{ cart_count }}</span>
+  </a>
+</nav>
+
+<!-- ── Main ───────────────────────────────────────────── -->
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────── -->
+<footer class="footer">
+  <p>© 2024 NOVU Store · Crafted with ♥</p>
+</footer>
+
+<!-- ── Toast ──────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

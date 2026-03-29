@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Order Placed — NOVU{% endblock %}
+
+{% block content %}
+<div class="success-page">
+  <div class="success-icon">✓</div>
+  <h1>Order Placed!</h1>
+  <p>Thanks for shopping with NOVU. Your order of <strong>${{ "%.2f"|format(total) }}</strong> is confirmed.</p>
+  <p class="success-sub">A confirmation email will be sent shortly.</p>
+  <a href="/" class="btn btn--primary">Continue Shopping</a>
+</div>
+{% endblock %}

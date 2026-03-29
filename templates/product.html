@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — NOVU{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/">Home</a> / <a href="/?category={{ product.category }}">{{ product.category }}</a> / {{ product.name }}
+</div>
+
+<section class="detail">
+  <div class="detail__img">
+    <img src="{{ product.image }}" alt="{{ product.name }}" />
+  </div>
+  <div class="detail__info">
+    <span class="pill pill--active">{{ product.category }}</span>
+    <h1>{{ product.name }}</h1>
+    <p class="detail__desc">{{ product.description }}</p>
+    <div class="detail__price">${{ "%.2f"|format(product.price) }}</div>
+    <div class="detail__stock">
+      {% if product.stock > 5 %}
+        <span class="stock stock--ok">✓ In Stock ({{ product.stock }} available)</span>
+      {% elif product.stock > 0 %}
+        <span class="stock stock--low">⚠ Low Stock ({{ product.stock }} left)</span>
+      {% else %}
+        <span class="stock stock--out">✕ Out of Stock</span>
+      {% endif %}
+    </div>
+    <div class="detail__qty">
+      <label>Qty</label>
+      <div class="qty-control">
+        <button onclick="changeQty(-1)">−</button>
+        <input type="number" id="qty" value="1" min="1" max="{{ product.stock }}" />
+        <button onclick="changeQty(1)">+</button>
+      </div>
+    </div>
+    <button class="btn btn--primary btn--full" onclick="addToCartDetail({{ product.id }})">
+      Add to Cart
+    </button>
+    <a class="btn btn--outline btn--full" href="/cart">View Cart</a>
+  </div>
+</section>
+
+{% if related %}
+<section class="related">
+  <h2>You May Also Like</h2>
+  <div class="product-grid product-grid--sm">
+    {% for p in related %}
+    <div class="card">
+      <a href="/product/{{ p.id }}" class="card__img-wrap">
+        <img src="{{ p.image }}" alt="{{ p.name }}" loading="lazy" />
+      </a>
+      <div class="card__body">
+        <a href="/product/{{ p.id }}" class="card__name">{{ p.name }}</a>
+        <div class="card__footer">
+          <span class="card__price">${{ "%.2f"|format(p.price) }}</span>
+          <button class="btn btn--add" onclick="addToCart({{ p.id }})">+ Add</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function changeQty(delta) {
+    const input = document.getElementById("qty");
+    const max   = parseInt(input.max);
+    let   val   = parseInt(input.value) + delta;
+    input.value = Math.max(1, Math.min(max, val));
+  }
+  function addToCartDetail(pid) {
+    const qty = parseInt(document.getElementById("qty").value);
+    addToCart(pid, qty);
+  }
+</script>
+{% endblock %}

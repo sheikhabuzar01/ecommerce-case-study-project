@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}NOVU Store — Shop{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<section class="hero">
+  <div class="hero__text">
+    <h1>Discover<br><em>Curated</em><br>Essentials</h1>
+    <p>Premium products, thoughtfully selected.</p>
+    <a class="btn btn--primary" href="#products">Shop Now</a>
+  </div>
+  <div class="hero__badge">NEW<br>ARRIVALS</div>
+</section>
+
+<!-- Category Pills -->
+<section class="categories" id="products">
+  <div class="categories__wrap">
+    {% for cat in categories %}
+    <a class="pill {% if cat == active_category %}pill--active{% endif %}"
+       href="/?category={{ cat }}">{{ cat }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Product Grid -->
+<section class="grid-section">
+  {% if products %}
+  <div class="product-grid">
+    {% for p in products %}
+    <div class="card" data-id="{{ p.id }}">
+      <a href="/product/{{ p.id }}" class="card__img-wrap">
+        <img src="{{ p.image }}" alt="{{ p.name }}" loading="lazy" />
+        <span class="card__badge">{{ p.category }}</span>
+      </a>
+      <div class="card__body">
+        <a href="/product/{{ p.id }}" class="card__name">{{ p.name }}</a>
+        <p class="card__desc">{{ p.description }}</p>
+        <div class="card__footer">
+          <span class="card__price">${{ "%.2f"|format(p.price) }}</span>
+          <button class="btn btn--add" onclick="addToCart({{ p.id }})">+ Add</button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>No products found. <a href="/">Clear filters</a></p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

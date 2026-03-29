@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Your Cart — NOVU{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Your Cart</h1>
+  <a href="/" class="btn btn--outline">← Continue Shopping</a>
+</div>
+
+{% if items %}
+<div class="cart-layout">
+  <div class="cart-items">
+    {% for item in items %}
+    <div class="cart-row" id="row-{{ item.id }}">
+      <img src="{{ item.image }}" alt="{{ item.name }}" />
+      <div class="cart-row__info">
+        <a href="/product/{{ item.id }}">{{ item.name }}</a>
+        <span class="cart-row__price">${{ "%.2f"|format(item.price) }}</span>
+      </div>
+      <div class="qty-control">
+        <button onclick="updateCart({{ item.id }}, {{ item.qty - 1 }})">−</button>
+        <input type="number" value="{{ item.qty }}" min="0"
+               onchange="updateCart({{ item.id }}, this.value)" />
+        <button onclick="updateCart({{ item.id }}, {{ item.qty + 1 }})">+</button>
+      </div>
+      <span class="cart-row__sub">${{ "%.2f"|format(item.subtotal) }}</span>
+      <button class="cart-row__remove" onclick="removeFromCart({{ item.id }})">✕</button>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="cart-summary">
+    <h2>Order Summary</h2>
+    <div class="summary-row"><span>Subtotal</span><span id="summary-total">${{ "%.2f"|format(total) }}</span></div>
+    <div class="summary-row"><span>Shipping</span><span>Free</span></div>
+    <div class="summary-row summary-row--total"><span>Total</span><span id="summary-grand">${{ "%.2f"|format(total) }}</span></div>
+    <a href="/checkout" class="btn btn--primary btn--full">Proceed to Checkout</a>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>🛒 Your cart is empty.</p>
+  <a href="/" class="btn btn--primary">Start Shopping</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function updateCart(pid, qty) {
+  qty = parseInt(qty);
+  const res = await fetch("/api/cart/update", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({product_id: pid, quantity: qty})
+  });
+  const data = await res.json();
+  updateBadge(data.cart_count);
+  if (qty <= 0) {
+    document.getElementById("row-" + pid)?.remove();
+  }
+  document.getElementById("summary-total").textContent  = "$" + data.cart_total.toFixed(2);
+  document.getElementById("summary-grand").textContent  = "$" + data.cart_total.toFixed(2);
+  if (data.cart_count === 0) location.reload();
+}
+
+async function removeFromCart(pid) {
+  const res = await fetch("/api/cart/remove", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({product_id: pid})
+  });
+  const data = await res.json();
+  updateBadge(data.cart_count);
+  document.getElementById("row-" + pid)?.remove();
+  document.getElementById("summary-total").textContent = "$" + data.cart_total.toFixed(2);
+  document.getElementById("summary-grand").textContent = "$" + data.cart_total.toFixed(2);
+  if (data.cart_count === 0) location.reload();
+}
+</script>
+{% endblock %}

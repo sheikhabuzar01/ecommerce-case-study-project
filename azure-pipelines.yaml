@@ -1,0 +1,208 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Resource & Connection Settings
+  armConnection: 'arm-connection'
+  resourceGroup: 'VisualStudioOnline-B7676031D19941C29CB021209999B63D'
+  storageAccount: 'corvitterraformstate'
+  container: 'tfstate'
+  tfstateKey: 'terraform.tfstate'
+  
+  # ACR & AKS Settings
+  acrName: 'ecomprojectregistry'
+  aksCluster: 'aks-ecom-cluster'
+  dockerRegistryConnection: 'ecom-project-registry-conn'
+  imageName: 'myapp'
+  
+  # Deployment Settings
+  k8sNamespace: 'production'
+  deploymentName: 'ecom-project' # Updated deployment name
+
+stages:
+
+# ─────────────────────────────
+# STAGE 1 — Build Docker Image
+# ─────────────────────────────
+- stage: Build
+  displayName: "Stage 1: Build Docker Image"
+  jobs:
+  - job: Build
+    steps:
+    - checkout: self
+    - task: Docker@2
+      displayName: "Build image"
+      inputs:
+        command: "build"
+        containerRegistry: "$(dockerRegistryConnection)"
+        repository: "$(imageName)"
+        dockerfile: "**/Dockerfile"
+        tags: |
+          $(Build.BuildId)
+          latest
+
+# ─────────────────────────────
+# STAGE 2 — Container Test
+# ─────────────────────────────
+- stage: Test
+  displayName: "Stage 2: Container Test"
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: Test
+    steps:
+    - checkout: self
+    - task: Docker@2
+      displayName: "Build test image"
+      inputs:
+        command: "build"
+        repository: "$(imageName)"
+        dockerfile: "**/Dockerfile"
+        tags: "test"
+    - script: |
+        docker run -d --name test-container -p 5000:5000 $(imageName):test
+        sleep 10
+        docker ps | grep test-container
+        if [ $? -ne 0 ]; then
+          echo "Container failed"
+          docker logs test-container
+          exit 1
+        fi
+        docker stop test-container && docker rm test-container
+      displayName: "Check container runtime"
+
+# ─────────────────────────────
+# STAGE 3 — Unit Tests
+# ─────────────────────────────
+- stage: UnitTest
+  displayName: "Stage 3: Run pytest"
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - job: UnitTest
+    steps:
+    - checkout: self
+    - task: Docker@2
+      displayName: "Build test image"
+      inputs:
+        command: "build"
+        repository: "$(imageName)"
+        dockerfile: "**/Dockerfile"
+        tags: "test"
+    - script: |
+        docker run --rm \
+          -v $(System.DefaultWorkingDirectory):/app \
+          -w /app \
+          $(imageName):test \
+          pytest tests/test_app.py --junitxml=results.xml
+      displayName: "Run pytest"
+    - task: PublishTestResults@2
+      displayName: "Publish Test Results"
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFiles: '**/results.xml'
+        testRunTitle: 'Pytest Results'
+
+# ─────────────────────────────
+# STAGE 4 — Push to ACR
+# ─────────────────────────────
+- stage: Push_to_ACR
+  displayName: "Stage 4: Image Push to ACR"
+  dependsOn: UnitTest
+  condition: succeeded()
+  jobs:
+  - job: PushImage
+    steps:
+    - checkout: self
+    - task: Docker@2
+      displayName: "Build and push image"
+      inputs:
+        command: "buildAndPush"
+        containerRegistry: "$(dockerRegistryConnection)"
+        repository: "$(imageName)"
+        dockerfile: "**/Dockerfile"
+        tags: |
+          $(Build.BuildId)
+          latest
+
+# ─────────────────────────────
+# STAGE 5 — Terraform Infrastructure
+# ─────────────────────────────
+- stage: Infra_Provisioning
+  displayName: 'Stage 5: Terraform Infrastructure'
+  dependsOn: Push_to_ACR
+  jobs:
+  - job: TerraformApply
+    steps:
+    - task: TerraformInstaller@0
+      inputs:
+        terraformVersion: 'latest'
+        
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        backendServiceArm: $(armConnection)
+        backendAzureRmResourceGroupName: $(resourceGroup)
+        backendAzureRmStorageAccountName: $(storageAccount)
+        backendAzureRmContainerName: $(container)
+        backendAzureRmKey: $(tfstateKey)
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        environmentServiceNameAzureRM: $(armConnection)
+        commandOptions: '-auto-approve'
+
+# ─────────────────────────────
+# STAGE 6 — Deploy to AKS
+# ─────────────────────────────
+- stage: Deploy
+  displayName: "Stage 6: Deploy to AKS"
+  dependsOn: Infra_Provisioning
+  condition: succeeded()
+  jobs:
+  - job: Deploy
+    steps:
+    - checkout: self
+
+    - task: AzureCLI@2
+      displayName: "Connect to AKS"
+      inputs:
+        azureSubscription: "$(armConnection)"
+        scriptType: "bash"
+        scriptLocation: "inlineScript"
+        inlineScript: |
+          az aks get-credentials \
+            --resource-group $(resourceGroup) \
+            --name $(aksCluster) \
+            --overwrite-existing
+          kubectl get nodes
+
+    - task: AzureCLI@2
+      displayName: "Deploy app to AKS"
+      inputs:
+        azureSubscription: "$(armConnection)"
+        scriptType: "bash"
+        scriptLocation: "inlineScript"
+        inlineScript: |
+          kubectl create namespace $(k8sNamespace) --dry-run=client -o yaml | kubectl apply -f -
+
+          # Applying manifests from the k8s folder
+          kubectl apply -f k8s/deployment.yaml -n $(k8sNamespace)
+          kubectl apply -f k8s/service.yaml -n $(k8sNamespace)
+
+          # Restarting specific deployment name
+          kubectl rollout restart deployment/$(deploymentName) -n $(k8sNamespace)
+          kubectl rollout status deployment/$(deploymentName) -n $(k8sNamespace) --timeout=300s
+
+          echo "Service info:"
+          kubectl get svc -n $(k8sNamespace)

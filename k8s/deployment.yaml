@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecom-project
+  labels:
+    app: ecom-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecom-project
+  template:
+    metadata:
+      labels:
+        app: ecom-project
+    spec:
+      containers:
+        - name: ecom-container
+          # Matches your Stage 4 push settings
+          image: ecomprojectregistry.azurecr.io/myapp:latest
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

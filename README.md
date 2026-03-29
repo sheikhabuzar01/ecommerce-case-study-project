@@ -1,4 +1,4 @@
-# NOVU Ecommerce Store
+#  Ecommerce Store
 
 A simple ecommerce website built with **Python Flask**, **HTML**, **CSS**, and **JavaScript**.
 
